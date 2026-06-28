@@ -2,7 +2,7 @@
 
 Free, open-source inference pipeline for personalized mRNA therapeutics. No pharma paywall, no API key, no institutional affiliation required. Runs locally at zero cost.
 
-Built with [Biopunk Labs](https://biopunklabs.org). Biology advisor: Elliot Roth.
+Built with [Biopunk Labs](https://biopunklab.com). Biology advisor: Elliot Roth.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
@@ -75,3 +75,4 @@ This project is licensed under the **GNU General Public License v3.0**.
 You are free to use, modify, and distribute this software. Any derivative work must also be released under GPL v3 — improvements stay open, always.
 
 See [LICENSE](./LICENSE) for full terms.
+
