@@ -13,7 +13,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from genomic_intake.storage import DATA_ROOT
+from cardiac_base_editor.genomic_intake.storage import DATA_ROOT
 
 LOG_PATH = DATA_ROOT / "audit.jsonl"
 

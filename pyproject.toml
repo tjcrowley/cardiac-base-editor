@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cardiac-base-editor"
+version = "0.2.0"
+description = "Open mRNA design pipeline (cardiac base editing) with consent-gated personal genome intake and a local-model query engine"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+requires-python = ">=3.10"
+dependencies = [
+    "requests",
+    "biopython",
+    "transformers",
+    "torch",
+    "mhcflurry",
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "python-multipart",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx"]
+
+[project.scripts]
+cbe = "cardiac_base_editor.cli:main"
+cbe-web = "cardiac_base_editor.web.app:serve"
+
+[tool.setuptools.packages.find]
+include = ["cardiac_base_editor*"]
+
+[tool.setuptools.package-data]
+"cardiac_base_editor.web" = ["templates/*.html", "static/*"]

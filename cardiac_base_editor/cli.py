@@ -1,14 +1,18 @@
 """
-CLI entry point for the genomic intake layer.
+Merged CLI entry point: consent management, guide-ranking pipeline, and the
+subject genome query engine.
 
 Usage:
-    python -m genomic_intake consent grant <subject_id> --scope PCSK9,LDLR [--days 365]
-    python -m genomic_intake consent revoke <subject_id>
-    python -m genomic_intake run <subject_id> <gene> --vcf path/to/subject.vcf [--editor ABE8e]
+    cbe consent grant <subject_id> --scope PCSK9,LDLR [--days 365]
+    cbe consent revoke <subject_id>
+    cbe run <subject_id> <gene> --vcf path/to/subject.vcf [--editor ABE8e]
+    cbe query <subject_id> "<question>" --vcf path/to/subject.vcf
 
-Every `run` invocation checks consent first (subjects.require_consent), builds
-the subject's personalized CDS for the target gene (extract.py), and hands it
-to the existing, unmodified pipeline.run() from pipeline.py.
+Every `run`/`query` invocation checks consent first (subjects.require_consent).
+`run` builds the subject's personalized CDS (extract.py) and hands it to the
+existing, unmodified pipeline.run() from pipeline.py. `query` routes a
+free-text question through query/nl.py's local-LLM front door, which itself
+only ever calls the same consent-gated functions in query/engine.py.
 """
 
 from __future__ import annotations
@@ -17,9 +21,10 @@ import argparse
 import getpass
 import sys
 
-from genomic_intake import subjects
-from genomic_intake.extract import build_personalized_cds
-from pipeline import KNOWN_TARGETS, run as pipeline_run
+from cardiac_base_editor.genomic_intake import subjects
+from cardiac_base_editor.genomic_intake.extract import build_personalized_cds
+from cardiac_base_editor.pipeline import KNOWN_TARGETS, run as pipeline_run
+from cardiac_base_editor.query import nl as query_nl
 
 
 def cmd_consent_grant(args: argparse.Namespace) -> None:
@@ -59,8 +64,12 @@ def cmd_run(args: argparse.Namespace) -> None:
         print(f"{i}. {g.protospacer} ({g.strand}) eff={g.efficiency_score:.2f} ot={g.off_target_score:.2f}")
 
 
+def cmd_query(args: argparse.Namespace) -> None:
+    print(query_nl.answer(args.subject_id, args.question, args.vcf))
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="genomic_intake")
+    parser = argparse.ArgumentParser(prog="cbe")
     sub = parser.add_subparsers(dest="command", required=True)
 
     consent = sub.add_parser("consent")
@@ -84,6 +93,12 @@ def main() -> None:
     run_p.add_argument("--editor", default="ABE8e")
     run_p.add_argument("--top-n", type=int, default=10, dest="top_n")
     run_p.set_defaults(func=cmd_run)
+
+    query_p = sub.add_parser("query")
+    query_p.add_argument("subject_id")
+    query_p.add_argument("question")
+    query_p.add_argument("--vcf", required=True)
+    query_p.set_defaults(func=cmd_query)
 
     args = parser.parse_args()
     args.func(args)

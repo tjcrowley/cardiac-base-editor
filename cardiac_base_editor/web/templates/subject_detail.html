@@ -62,6 +62,22 @@
 </section>
 
 <section class="card">
+    <h2>Ask a question</h2>
+    <p><small>Answered by a local model — your question and the resulting query output are sent to a local Ollama instance; the raw genome/VCF file is never included in that prompt.</small></p>
+    <form hx-post="/subjects/{{ subject_id }}/query" hx-target="#query-result" hx-swap="innerHTML"
+          hx-encoding="multipart/form-data">
+        <label>Question
+            <input type="text" name="question" required placeholder="e.g. does this subject have any PCSK9 variants?">
+        </label>
+        <label>Subject VCF
+            <input type="file" name="vcf" accept=".vcf,.vcf.gz" required>
+        </label>
+        <button type="submit">Ask</button>
+    </form>
+    <div id="query-result"></div>
+</section>
+
+<section class="card">
     <h2>Audit history</h2>
     <table>
         <thead><tr><th>Time</th><th>Action</th><th>Detail</th><th>Operator</th><th>Allowed</th></tr></thead>

@@ -11,8 +11,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from genomic_intake import audit, storage, subjects
-from genomic_intake import extract
+from cardiac_base_editor.genomic_intake import audit, storage, subjects
+from cardiac_base_editor.genomic_intake import extract
 
 
 @pytest.fixture(autouse=True)

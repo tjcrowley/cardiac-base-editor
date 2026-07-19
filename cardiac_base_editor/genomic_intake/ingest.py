@@ -15,7 +15,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from genomic_intake.storage import derived_dir
+from cardiac_base_editor.genomic_intake.storage import derived_dir
 
 DEEPVARIANT_IMAGE = "google/deepvariant:1.6.1"
 

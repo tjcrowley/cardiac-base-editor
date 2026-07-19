@@ -1,11 +1,13 @@
 """
-Local web UI for genomic_intake. Single-operator, localhost-only by default —
-this is a friendlier front end over the same consent/audit/extract/pipeline
-logic used by genomic_intake.cli, not a hosted multi-tenant service.
+Local web UI for cardiac_base_editor. Single-operator, localhost-only by
+default — a friendlier front end over the same consent/audit/extract/pipeline/
+query-engine logic used by cardiac_base_editor.cli, not a hosted
+multi-tenant service.
 
 Run:
-    uvicorn genomic_intake.web.app:app --reload
-    (binds to 127.0.0.1:8000 by default via uvicorn's own default host)
+    cbe-web
+    (or: uvicorn cardiac_base_editor.web.app:app --reload)
+    binds to 127.0.0.1:8000 by default
 """
 
 from __future__ import annotations
@@ -19,9 +21,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from genomic_intake import audit, subjects
-from genomic_intake.extract import build_personalized_cds
-from pipeline import KNOWN_TARGETS, run as pipeline_run
+from cardiac_base_editor.genomic_intake import audit, subjects
+from cardiac_base_editor.genomic_intake.extract import build_personalized_cds
+from cardiac_base_editor.pipeline import KNOWN_TARGETS, run as pipeline_run
+from cardiac_base_editor.query import nl as query_nl
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -41,8 +44,7 @@ def _retention_status(record: subjects.ConsentRecord) -> str:
 
 
 def _render(request: Request, template: str, context: dict) -> HTMLResponse:
-    context["request"] = request
-    return templates.TemplateResponse(template, context)
+    return templates.TemplateResponse(request, template, context)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -122,3 +124,29 @@ async def run_pipeline(
         Path(tmp_path).unlink(missing_ok=True)
 
     return _render(request, "run_result.html", {"subject_id": subject_id, "gene": gene, "results": results, "error": None})
+
+
+@app.post("/subjects/{subject_id}/query", response_class=HTMLResponse)
+async def query_subject(
+    request: Request,
+    subject_id: str,
+    question: str = Form(...),
+    vcf: UploadFile = File(...),
+):
+    with tempfile.NamedTemporaryFile(suffix=".vcf", delete=False) as tmp:
+        shutil.copyfileobj(vcf.file, tmp)
+        tmp_path = tmp.name
+
+    try:
+        answer_text = query_nl.answer(subject_id, question, tmp_path)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    return _render(request, "query_result.html", {"question": question, "answer": answer_text})
+
+
+def serve() -> None:
+    """Console-script entry point (`cbe-web`)."""
+    import uvicorn
+
+    uvicorn.run("cardiac_base_editor.web.app:app", host="127.0.0.1", port=8000)

@@ -45,33 +45,21 @@ consent grant  →  ingest (FASTQ→VCF, optional)  →  extract (personalized C
 
 ```bash
 # One-time: grant consent for a subject, scoped to specific genes
-python -m genomic_intake consent grant elliot --scope PCSK9,LDLR --days 365
+cbe consent grant elliot --scope PCSK9,LDLR --days 365
 
 # Run the existing guide-ranking pipeline against that subject's real variants
-python -m genomic_intake run elliot PCSK9 --vcf /path/to/elliot.vcf
+cbe run elliot PCSK9 --vcf /path/to/elliot.vcf
 
 # Revoke consent — purges all stored data for the subject by default
-python -m genomic_intake consent revoke elliot
+cbe consent revoke elliot
 ```
 
 If starting from raw sequencer output instead of a VCF, run `ingest.ingest_fastq()`
 first (requires `minimap2`, `samtools`, and `docker` for DeepVariant) to produce
 the VCF that `run` expects.
 
-## Web UI
-
-A local, browser-based front end over the same consent/audit/extract/pipeline logic —
-no separate service, no new business logic, just friendlier forms and tables:
-
-```bash
-pip install -r requirements.txt
-uvicorn genomic_intake.web.app:app --reload
-```
-
-Open `http://127.0.0.1:8000`. Binds to localhost only by default — this is a
-single-operator tool for the box it runs on, not a hosted service. From the dashboard
-you can grant/revoke consent per subject, upload a subject's VCF and run it against a
-target gene, and review that subject's full audit history in one place.
+See the top-level `README.md` for the web UI and the natural-language query engine
+(`cbe query`), both of which sit on top of this module without changing its logic.
 
 ## Scope limitations (v1)
 

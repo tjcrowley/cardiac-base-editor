@@ -13,8 +13,8 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from genomic_intake import audit, extract, storage, subjects
-from genomic_intake.web import app as web_app
+from cardiac_base_editor.genomic_intake import audit, extract, storage, subjects
+from cardiac_base_editor.web import app as web_app
 
 
 @pytest.fixture(autouse=True)

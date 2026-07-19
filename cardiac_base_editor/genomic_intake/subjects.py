@@ -25,8 +25,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from genomic_intake import audit
-from genomic_intake.storage import DATA_ROOT, init_subject_storage, purge_subject
+from cardiac_base_editor.genomic_intake import audit
+from cardiac_base_editor.genomic_intake.storage import DATA_ROOT, init_subject_storage, purge_subject
 
 REGISTRY_PATH = DATA_ROOT / "subjects.json"
 

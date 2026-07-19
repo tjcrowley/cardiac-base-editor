@@ -21,7 +21,7 @@ import json
 import urllib.request
 from dataclasses import dataclass
 
-from pipeline import ENSEMBL_REST, fetch_cds
+from cardiac_base_editor.pipeline import ENSEMBL_REST, fetch_cds
 
 COMPLEMENT = str.maketrans("ACGT", "TGCA")
 
