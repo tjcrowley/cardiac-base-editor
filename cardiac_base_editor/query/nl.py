@@ -39,6 +39,11 @@ genomic subject's data. Respond with ONLY a JSON object: {"function": "<name>", 
 - list_variants(gene: str) -> list of the subject's variants found in that gene's coding sequence
 - rank_guides(gene: str, editor: str = "ABE8e") -> ranked guide RNA candidates for that gene
 - explain_variant(gene: str, genomic_pos: int) -> detailed consequence of one specific variant
+- verify_off_target(gene: str, guide_index: int = 0, editor: str = "ABE8e") -> real genome-wide BLAST
+  off-target check for one ranked guide (slow, real network call - only use when explicitly asked
+  to verify/check off-target risk for a specific guide)
+- rank_neoantigens(gene: str, genomic_pos: int, hla_alleles: list[str]) -> ranked candidate neoantigen
+  peptides by predicted MHC-I binding, for a somatic variant and a list of HLA alleles (e.g. ["A0201", "B0702"])
 
 If the question doesn't clearly map to one of these, respond with:
 {"function": null, "args": {}}
@@ -48,6 +53,8 @@ FUNCTIONS = {
     "list_variants": engine.list_variants,
     "rank_guides": engine.rank_guides,
     "explain_variant": engine.explain_variant,
+    "verify_off_target": engine.verify_off_target,
+    "rank_neoantigens": engine.rank_neoantigens,
 }
 
 

@@ -41,6 +41,8 @@ python -m cardiac_base_editor.pipeline PCSK9   # reference-sequence guide rankin
 cbe consent grant elliot --scope PCSK9 --days 365   # genomic_intake: consent-gated real-genome intake
 cbe run elliot PCSK9 --vcf /path/to/elliot.vcf
 cbe query elliot "does this subject have any PCSK9 variants?" --vcf /path/to/elliot.vcf
+cbe query elliot "check off-target risk for the top guide in PCSK9" --vcf /path/to/elliot.vcf
+cbe query elliot "rank neoantigens for the variant at position 55039847 in PCSK9 for HLA alleles A0201 and B0702" --vcf /path/to/elliot.vcf
 
 cbe-web   # local web UI at http://127.0.0.1:8000
 ```
@@ -58,11 +60,12 @@ raw genome file.
 ## Roadmap
 
 1. **Guide scoring:** Replace heuristics with [BE-DICT](https://github.com/hui-liang/BE-DICT) transformer — **interface shipped** (`cardiac_base_editor/models/be_dict.py`), pluggable via `CBE_BEDICT_CHECKPOINT`; falls back to the existing heuristic until a real checkpoint is available (next funded milestone)
-2. **Off-target:** Genome-wide BLAST or crisprSFM API call per guide
+2. **Off-target:** Genome-wide BLAST per guide — **shipped** (`cardiac_base_editor/models/off_target.py`), real queries against NCBI's public BLAST API; opt-in per-guide via `cbe query`'s `verify_off_target` (not run automatically — a real genome-wide BLAST search takes real wall-clock time)
 3. **Protein consequence:** ESM-2 call on resulting amino acid change — **shipped** (`cardiac_base_editor/models/protein_consequence.py`), used by `cbe query`'s `explain_variant`
-4. **Cancer — HLA typing:** Patient alleles from `optitype` or `arcasHLA` on tumor WES data
+4. **Cancer — MHC binding:** **shipped** (`cardiac_base_editor/cancer/`) — somatic variant → candidate neoantigen peptides → MHC-I binding ranking via mhcflurry, exposed as `cbe query`'s `rank_neoantigens`. Still requires HLA alleles to be supplied directly (see #4b)
+4b. **Cancer — HLA typing:** Deriving those alleles from a patient's own tumor WES via `optitype` or `arcasHLA`, rather than supplying them directly — not yet built
 5. **Cancer — T-cell response:** pMTnet call after MHC binding filter
-6. **mRNA sequence design:** LinearDesign for codon-optimized mRNA sequence of final payload
+6. **mRNA sequence design:** [LinearDesign](https://github.com/LinearDesignSoftware/LinearDesign) for codon-optimized mRNA sequence of final payload — real tool exists but is C++, needs compiling from source; bigger lift, not yet built
 7. **Delivery:** LNP formulation predictor (Moderna/Inivio published datasets)
 
 ---
