@@ -22,6 +22,7 @@ from cardiac_base_editor.genomic_intake.extract import (
 )
 from cardiac_base_editor.cancer.mhc_binding import rank_binders
 from cardiac_base_editor.cancer.neoantigen import candidate_peptides
+from cardiac_base_editor.mrna_design import design_mrna
 from cardiac_base_editor.models.off_target import score_off_target
 from cardiac_base_editor.models.protein_consequence import score_substitution
 from cardiac_base_editor.pipeline import (
@@ -34,6 +35,20 @@ from cardiac_base_editor.pipeline import (
 
 def _resolve_transcript(gene: str) -> str:
     return KNOWN_TARGETS.get(gene.upper(), gene)
+
+
+def _translate_until_stop(cds: str) -> str:
+    """Translates a CDS codon-by-codon, stopping at the first stop codon
+    (proper protein truncation) rather than translating the whole sequence
+    and stripping only a trailing "*" — a premature/internal stop must end
+    translation, not just get chopped off the end."""
+    protein = []
+    for i in range(0, len(cds) - len(cds) % 3, 3):
+        aa = CODON_TABLE.get(cds[i:i + 3], "?")
+        if aa == "*":
+            break
+        protein.append(aa)
+    return "".join(protein)
 
 
 def _variant_to_protein_change(transcript_id: str, vcf_path: str, genomic_pos: int) -> dict:
@@ -61,8 +76,7 @@ def _variant_to_protein_change(transcript_id: str, vcf_path: str, genomic_pos: i
     ref_aa = CODON_TABLE.get(ref_codon, "?")
     alt_aa = CODON_TABLE.get(alt_codon, "?")
 
-    full_translation = [CODON_TABLE.get(cds[i:i + 3], "?") for i in range(0, len(cds) - len(cds) % 3, 3)]
-    protein_seq = "".join(full_translation).rstrip("*")  # ESM-2's vocabulary has no stop-codon token
+    protein_seq = _translate_until_stop(cds)  # ESM-2's vocabulary has no stop-codon token
 
     return {
         "variant": variant,
@@ -182,3 +196,18 @@ def rank_neoantigens(subject_id: str, gene: str, vcf_path: str, genomic_pos: int
         return []
 
     return rank_binders([p["peptide"] for p in peptides], hla_alleles)
+
+
+def design_mrna_payload(subject_id: str, gene: str, vcf_path: str, operator: str = "query-engine") -> dict:
+    """
+    Final pipeline step: subject's personalized CDS for the target gene ->
+    translated protein -> codon-optimized mRNA payload (LinearDesign). Reuses
+    the same build_personalized_cds path rank_guides already uses.
+    """
+    subjects.require_consent(subject_id, gene, operator=operator)
+
+    transcript_id = _resolve_transcript(gene)
+    personalized_cds = build_personalized_cds(transcript_id, vcf_path)
+    protein_seq = _translate_until_stop(personalized_cds)
+
+    return design_mrna(protein_seq)

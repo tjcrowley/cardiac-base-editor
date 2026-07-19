@@ -44,6 +44,8 @@ genomic subject's data. Respond with ONLY a JSON object: {"function": "<name>", 
   to verify/check off-target risk for a specific guide)
 - rank_neoantigens(gene: str, genomic_pos: int, hla_alleles: list[str]) -> ranked candidate neoantigen
   peptides by predicted MHC-I binding, for a somatic variant and a list of HLA alleles (e.g. ["A0201", "B0702"])
+- design_mrna_payload(gene: str) -> codon-optimized mRNA sequence for the subject's personalized
+  version of that gene (final step: turns the edited/target sequence into an actual mRNA payload)
 
 If the question doesn't clearly map to one of these, respond with:
 {"function": null, "args": {}}
@@ -55,6 +57,7 @@ FUNCTIONS = {
     "explain_variant": engine.explain_variant,
     "verify_off_target": engine.verify_off_target,
     "rank_neoantigens": engine.rank_neoantigens,
+    "design_mrna_payload": engine.design_mrna_payload,
 }
 
 

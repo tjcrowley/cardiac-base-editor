@@ -159,3 +159,27 @@ def test_rank_neoantigens_calls_candidate_peptides_and_rank_binders(monkeypatch,
     result = engine.rank_neoantigens("elliot", "PCSK9", synthetic_vcf, genomic_pos=1003, hla_alleles=["A0201"])
     assert result[0]["peptide"] == "AGGCPKFIS"
     assert result[0]["best_allele"] == "A0201"
+
+
+# ── design_mrna_payload ────────────────────────────────────────────────────
+
+def test_design_mrna_payload_blocked_without_consent(synthetic_transcript, synthetic_vcf):
+    with pytest.raises(subjects.ConsentError):
+        engine.design_mrna_payload("elliot", "PCSK9", synthetic_vcf)
+
+
+def test_design_mrna_payload_calls_design_mrna_with_translated_protein(monkeypatch, synthetic_transcript, synthetic_vcf):
+    subjects.grant_consent("elliot", scope=["PCSK9"], operator="tester")
+
+    captured = {}
+    def fake_design_mrna(protein_seq, **kwargs):
+        captured["protein_seq"] = protein_seq
+        return {"mrna_sequence": "AUG", "mrna_structure": ".", "folding_free_energy_kcal_mol": -1.0, "cai": 0.9}
+
+    monkeypatch.setattr(engine, "design_mrna", fake_design_mrna)
+
+    result = engine.design_mrna_payload("elliot", "PCSK9", synthetic_vcf)
+    # cds pos 4 (G->A) falls in codon index 1 (bases 3-5, "GGG"->"AGG": Gly->Arg),
+    # so ATG|AGG|CCC|AAA|TTT|TAG... -> M-R-P-K-F, truncated at the TAG stop codon
+    assert captured["protein_seq"] == "MRPKF"
+    assert result["cai"] == 0.9

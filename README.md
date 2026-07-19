@@ -63,10 +63,10 @@ raw genome file.
 2. **Off-target:** Genome-wide BLAST per guide — **shipped** (`cardiac_base_editor/models/off_target.py`), real queries against NCBI's public BLAST API; opt-in per-guide via `cbe query`'s `verify_off_target` (not run automatically — a real genome-wide BLAST search takes real wall-clock time)
 3. **Protein consequence:** ESM-2 call on resulting amino acid change — **shipped** (`cardiac_base_editor/models/protein_consequence.py`), used by `cbe query`'s `explain_variant`
 4. **Cancer — MHC binding:** **shipped** (`cardiac_base_editor/cancer/`) — somatic variant → candidate neoantigen peptides → MHC-I binding ranking via mhcflurry, exposed as `cbe query`'s `rank_neoantigens`. Still requires HLA alleles to be supplied directly (see #4b)
-4b. **Cancer — HLA typing:** Deriving those alleles from a patient's own tumor WES via `optitype` or `arcasHLA`, rather than supplying them directly — not yet built
-5. **Cancer — T-cell response:** pMTnet call after MHC binding filter
-6. **mRNA sequence design:** [LinearDesign](https://github.com/LinearDesignSoftware/LinearDesign) for codon-optimized mRNA sequence of final payload — real tool exists but is C++, needs compiling from source; bigger lift, not yet built
-7. **Delivery:** LNP formulation predictor (Moderna/Inivio published datasets)
+4b. **Cancer — HLA typing:** **interface shipped** (`cardiac_base_editor/cancer/hla_typing.py`), a real subprocess wrapper around [arcasHLA](https://github.com/RabadanLab/arcasHLA) — not live-verified here, since it genotypes real patient RNA-seq (BAM) and no synthetic sample would produce a meaningful call; box-only until run against real tumor RNA-seq
+5. **Cancer — T-cell response:** **interface shipped** (`cardiac_base_editor/cancer/tcr_binding.py`), a real subprocess wrapper around [pMTnet](https://github.com/tianshilu/pMTnet) — not live-verified here, since pMTnet is pinned to TensorFlow 1.x/Keras 2.2.4/numpy 1.16.3, none of which have wheels for this environment's Python 3.11/arm64; needs a compatible runtime (likely Docker w/ an old TF1 image) to actually run
+6. **mRNA sequence design:** **shipped** (`cardiac_base_editor/mrna_design.py`) — real [LinearDesign](https://github.com/LinearDesignSoftware/LinearDesign) integration, compiles clean with `make` (Apple clang/GCC, no exotic deps) and runs by calling the compiled binary directly (its bundled python2 CLI wrapper is skipped entirely). Exposed as `cbe query`'s `design_mrna_payload` — verified end-to-end, including translating the returned mRNA back and confirming it encodes the same protein
+7. **Delivery:** LNP formulation predictor (Moderna/Inivio published datasets) — no public trained model exists for this; not attempted
 
 ---
 
