@@ -1,0 +1,15 @@
+# Guide-ranking pipeline (pipeline.py)
+transformers
+torch
+mhcflurry
+biopython
+requests
+
+# genomic_intake web UI
+fastapi
+uvicorn
+jinja2
+python-multipart
+
+# tests
+pytest

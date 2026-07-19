@@ -98,6 +98,14 @@ def get_consent(subject_id: str) -> ConsentRecord | None:
     return ConsentRecord(subject_id=subject_id, **registry[subject_id])
 
 
+def list_all() -> dict[str, ConsentRecord]:
+    registry = _load_registry()
+    return {
+        subject_id: ConsentRecord(subject_id=subject_id, **fields)
+        for subject_id, fields in registry.items()
+    }
+
+
 def require_consent(subject_id: str, gene: str, operator: str = "unknown") -> ConsentRecord:
     """
     Raise ConsentError if the subject has no active consent covering this

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{{ subject_id }} — genomic_intake{% endblock %}
+{% block content %}
+<p><a href="/">← all subjects</a></p>
+<h1>{{ subject_id }}</h1>
+<p><span class="badge status-{{ status | replace(' ', '-') }}">{{ status }}</span></p>
+
+<section class="card" id="consent-panel">
+    <h2>Consent</h2>
+    {% if record %}
+        <ul class="fields">
+            <li><strong>Scope:</strong> {{ record.scope | join(', ') }}</li>
+            <li><strong>Granted:</strong> {{ record.granted_at }}</li>
+            <li><strong>Retention:</strong> {{ record.retention_days }} days</li>
+            {% if record.revoked_at %}<li><strong>Revoked:</strong> {{ record.revoked_at }}</li>{% endif %}
+        </ul>
+        {% if record.active %}
+        <form method="post" action="/subjects/{{ subject_id }}/revoke"
+              onsubmit="return confirm('Revoke consent and permanently delete all stored data for {{ subject_id }}? This cannot be undone.');">
+            <input type="hidden" name="purge_data" value="true">
+            <button type="submit" class="danger">Revoke consent &amp; purge data</button>
+        </form>
+        {% endif %}
+    {% else %}
+        <p><em>No consent record for this subject.</em></p>
+    {% endif %}
+
+    <h3>{{ 'Update' if record else 'Grant' }} consent</h3>
+    <form method="post" action="/subjects/{{ subject_id }}/consent">
+        <label>Scope (comma-separated genes, or * for all)
+            <input type="text" name="scope" value="{{ record.scope | join(',') if record else '*' }}">
+        </label>
+        <label>Retention (days)
+            <input type="number" name="retention_days" value="{{ record.retention_days if record else 365 }}" min="1">
+        </label>
+        <button type="submit">Save</button>
+    </form>
+</section>
+
+<section class="card">
+    <h2>Run guide-ranking pipeline</h2>
+    <form hx-post="/subjects/{{ subject_id }}/run" hx-target="#run-result" hx-swap="innerHTML"
+          hx-encoding="multipart/form-data">
+        <label>Gene
+            <select name="gene">
+                {% for g in known_genes %}<option value="{{ g }}">{{ g }}</option>{% endfor %}
+            </select>
+        </label>
+        <label>Subject VCF
+            <input type="file" name="vcf" accept=".vcf,.vcf.gz" required>
+        </label>
+        <label>Editor
+            <select name="editor">
+                <option value="ABE8e">ABE8e</option>
+                <option value="ABE8e-NG">ABE8e-NG</option>
+                <option value="ABE7.10">ABE7.10</option>
+            </select>
+        </label>
+        <button type="submit">Run</button>
+    </form>
+    <div id="run-result"></div>
+</section>
+
+<section class="card">
+    <h2>Audit history</h2>
+    <table>
+        <thead><tr><th>Time</th><th>Action</th><th>Detail</th><th>Operator</th><th>Allowed</th></tr></thead>
+        <tbody>
+            {% for entry in history %}
+            <tr class="{{ '' if entry.allowed else 'denied' }}">
+                <td>{{ entry.timestamp }}</td>
+                <td>{{ entry.action }}</td>
+                <td>{{ entry.detail }}</td>
+                <td>{{ entry.operator }}</td>
+                <td>{{ 'yes' if entry.allowed else 'NO' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5"><em>No audit entries yet.</em></td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

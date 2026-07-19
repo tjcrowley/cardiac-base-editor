@@ -1,0 +1,28 @@
+{% if error %}
+<p class="error">Blocked: {{ error }}</p>
+{% elif not results %}
+<p><em>No safe guides found for {{ gene }}.</em></p>
+{% else %}
+<table>
+    <thead>
+        <tr><th>#</th><th>Protospacer</th><th>Strand</th><th>GC%</th><th>Efficiency</th><th>Off-target</th><th>Consequence</th></tr>
+    </thead>
+    <tbody>
+        {% for g in results %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td><code>{{ g.protospacer }}</code></td>
+            <td>{{ g.strand }}</td>
+            <td>{{ (g.gc_content * 100) | round(0) }}%</td>
+            <td>{{ '%.2f' | format(g.efficiency_score) }}</td>
+            <td>{{ '%.2f' | format(g.off_target_score) }}</td>
+            <td>
+                {% for c in g.consequences %}
+                    {{ c.ref_aa }}{{ c.codon_position }}{{ c.alt_aa }}{% if c.is_synonymous %} (syn){% endif %}{% if not loop.last %}, {% endif %}
+                {% else %}—{% endfor %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}

@@ -58,6 +58,21 @@ If starting from raw sequencer output instead of a VCF, run `ingest.ingest_fastq
 first (requires `minimap2`, `samtools`, and `docker` for DeepVariant) to produce
 the VCF that `run` expects.
 
+## Web UI
+
+A local, browser-based front end over the same consent/audit/extract/pipeline logic —
+no separate service, no new business logic, just friendlier forms and tables:
+
+```bash
+pip install -r requirements.txt
+uvicorn genomic_intake.web.app:app --reload
+```
+
+Open `http://127.0.0.1:8000`. Binds to localhost only by default — this is a
+single-operator tool for the box it runs on, not a hosted service. From the dashboard
+you can grant/revoke consent per subject, upload a subject's VCF and run it against a
+target gene, and review that subject's full audit history in one place.
+
 ## Scope limitations (v1)
 
 - **SNVs only.** Indels aren't applied — they'd shift every downstream codon,
