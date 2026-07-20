@@ -96,14 +96,20 @@ def test_answer_full_flow_with_mocked_model(monkeypatch, synthetic_vcf):
 
 
 def _ollama_reachable() -> bool:
+    """True only if Ollama is running AND the configured model (nl.QUERY_MODEL,
+    override via CBE_QUERY_MODEL) is actually pulled — Ollama being reachable
+    isn't enough, /api/chat 404s if the specific model isn't present, which
+    otherwise looks like a real failure rather than a skip."""
     try:
-        requests.get(f"{nl.OLLAMA_URL}/api/tags", timeout=2).raise_for_status()
-        return True
+        resp = requests.get(f"{nl.OLLAMA_URL}/api/tags", timeout=2)
+        resp.raise_for_status()
+        pulled_models = {m["name"] for m in resp.json().get("models", [])}
+        return nl.QUERY_MODEL in pulled_models
     except requests.RequestException:
         return False
 
 
-@pytest.mark.skipif(not _ollama_reachable(), reason="Ollama not reachable on this host")
+@pytest.mark.skipif(not _ollama_reachable(), reason="Ollama not reachable on this host, or CBE_QUERY_MODEL isn't pulled")
 def test_live_smoke_against_local_ollama(monkeypatch, synthetic_vcf):
     """
     Live end-to-end test against whatever model is actually installed

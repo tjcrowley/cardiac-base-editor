@@ -1,0 +1,33 @@
+# Runs the test suite on every push/PR to main. The optional real-model
+# integrations (LinearDesign, LiON/chemprop, BEDICT-V2, mhcflurry's ~600MB
+# weights, a local Ollama instance) aren't set up here — those tests already
+# skip themselves via pytest.mark.skipif when their env vars/services aren't
+# present (see tests/test_mrna_design.py, test_lnp_delivery.py,
+# test_be_dict.py, test_mhc_binding.py, test_query_nl.py), so this still
+# exercises real logic, just not the heaviest external dependencies. One
+# exception: tests/test_off_target.py's live NCBI BLAST smoke test gates on
+# network reachability, not an env var, so it does run for real here.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package + dev dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest tests/ -v --durations=10
