@@ -5,6 +5,7 @@ Free, open-source inference pipeline for personalized mRNA therapeutics. No phar
 Built with [Biopunk Labs](https://biopunklab.com). Biology advisor: Elliot Roth.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![tests](https://github.com/tjcrowley/cardiac-base-editor/actions/workflows/tests.yml/badge.svg)](https://github.com/tjcrowley/cardiac-base-editor/actions/workflows/tests.yml)
 
 ---
 
