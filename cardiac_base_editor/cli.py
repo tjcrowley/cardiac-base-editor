@@ -1,28 +1,33 @@
 """
-Merged CLI entry point: consent management, guide-ranking pipeline, and the
-subject genome query engine.
+Merged CLI entry point: consent management, guide-ranking pipeline, the
+subject genome query engine, and LNP delivery prediction.
 
 Usage:
     cbe consent grant <subject_id> --scope PCSK9,LDLR [--days 365]
     cbe consent revoke <subject_id>
     cbe run <subject_id> <gene> --vcf path/to/subject.vcf [--editor ABE8e]
     cbe query <subject_id> "<question>" --vcf path/to/subject.vcf
+    cbe lnp-predict formulations.json
 
 Every `run`/`query` invocation checks consent first (subjects.require_consent).
 `run` builds the subject's personalized CDS (extract.py) and hands it to the
 existing, unmodified pipeline.run() from pipeline.py. `query` routes a
 free-text question through query/nl.py's local-LLM front door, which itself
 only ever calls the same consent-gated functions in query/engine.py.
+`lnp-predict` is NOT consent-gated — it predicts delivery efficacy for a
+candidate LNP formulation, not subject genomic data (see lnp_delivery.py).
 """
 
 from __future__ import annotations
 
 import argparse
 import getpass
+import json
 import sys
 
 from cardiac_base_editor.genomic_intake import subjects
 from cardiac_base_editor.genomic_intake.extract import build_personalized_cds
+from cardiac_base_editor.lnp_delivery import predict_delivery_efficacy
 from cardiac_base_editor.pipeline import KNOWN_TARGETS, run as pipeline_run
 from cardiac_base_editor.query import nl as query_nl
 
@@ -68,6 +73,20 @@ def cmd_query(args: argparse.Namespace) -> None:
     print(query_nl.answer(args.subject_id, args.question, args.vcf))
 
 
+def cmd_lnp_predict(args: argparse.Namespace) -> None:
+    with open(args.formulations_json) as f:
+        formulations = json.load(f)
+
+    results = predict_delivery_efficacy(formulations)
+    results.sort(key=lambda r: r["predicted_experiment_value"], reverse=True)
+
+    print(f"{'#':<3} {'IL_SMILES':<50} {'Predicted value':<15}")
+    print("-" * 70)
+    for i, r in enumerate(results, 1):
+        smiles = r["il_smiles"][:47] + "..." if len(r["il_smiles"]) > 50 else r["il_smiles"]
+        print(f"{i:<3} {smiles:<50} {r['predicted_experiment_value']:<15.4f}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="cbe")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -99,6 +118,10 @@ def main() -> None:
     query_p.add_argument("question")
     query_p.add_argument("--vcf", required=True)
     query_p.set_defaults(func=cmd_query)
+
+    lnp_p = sub.add_parser("lnp-predict")
+    lnp_p.add_argument("formulations_json", help="Path to a JSON file: a list of formulation dicts")
+    lnp_p.set_defaults(func=cmd_lnp_predict)
 
     args = parser.parse_args()
     args.func(args)

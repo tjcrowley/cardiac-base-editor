@@ -44,8 +44,15 @@ cbe query elliot "does this subject have any PCSK9 variants?" --vcf /path/to/ell
 cbe query elliot "check off-target risk for the top guide in PCSK9" --vcf /path/to/elliot.vcf
 cbe query elliot "rank neoantigens for the variant at position 55039847 in PCSK9 for HLA alleles A0201 and B0702" --vcf /path/to/elliot.vcf
 
+cbe lnp-predict formulations.json   # LNP delivery-efficacy prediction (LiON) — see setup below, not subject-gated
+
 cbe-web   # local web UI at http://127.0.0.1:8000
 ```
+
+`cbe lnp-predict` needs its own environment (`chemprop==1.7.0` requires Python
+3.7/3.8, incompatible with this package's own Python 3.10+ requirement) — see
+`cardiac_base_editor/lnp_delivery.py`'s module docstring for the one-time
+`pyenv`/venv setup and the `CBE_LNPDB_DIR` / `CBE_LION_VENV_DIR` env vars.
 
 See `cardiac_base_editor/genomic_intake/README.md` for the full consent/audit/
 retention model behind real-genome runs and queries — every genome is treated
@@ -66,7 +73,7 @@ raw genome file.
 4b. **Cancer — HLA typing:** **interface shipped** (`cardiac_base_editor/cancer/hla_typing.py`), a real subprocess wrapper around [arcasHLA](https://github.com/RabadanLab/arcasHLA) — not live-verified here, since it genotypes real patient RNA-seq (BAM) and no synthetic sample would produce a meaningful call; box-only until run against real tumor RNA-seq
 5. **Cancer — T-cell response:** **interface shipped** (`cardiac_base_editor/cancer/tcr_binding.py`), a real subprocess wrapper around [pMTnet](https://github.com/tianshilu/pMTnet) — not live-verified here, since pMTnet is pinned to TensorFlow 1.x/Keras 2.2.4/numpy 1.16.3, none of which have wheels for this environment's Python 3.11/arm64; needs a compatible runtime (likely Docker w/ an old TF1 image) to actually run
 6. **mRNA sequence design:** **shipped** (`cardiac_base_editor/mrna_design.py`) — real [LinearDesign](https://github.com/LinearDesignSoftware/LinearDesign) integration, compiles clean with `make` (Apple clang/GCC, no exotic deps) and runs by calling the compiled binary directly (its bundled python2 CLI wrapper is skipped entirely). Exposed as `cbe query`'s `design_mrna_payload` — verified end-to-end, including translating the returned mRNA back and confirming it encodes the same protein
-7. **Delivery:** LNP formulation predictor (Moderna/Inivio published datasets) — no public trained model exists for this; not attempted
+7. **Delivery:** **shipped** (`cardiac_base_editor/lnp_delivery.py`) — real integration of [LiON](https://www.nature.com/articles/s41587-024-02490-y) (Witten et al. 2024), a pretrained `chemprop` model trained on the public [LNPDB](https://github.com/evancollins1/LNPDB) dataset. Predictions verified against LNPDB's own bundled test results to floating-point precision. Exposed as `cbe lnp-predict`, not part of `cbe query` — it predicts a candidate LNP formulation's delivery efficacy, not anything about subject genomic data, so it isn't consent-gated
 
 ---
 
