@@ -26,28 +26,32 @@ import json
 import os
 import subprocess
 import tempfile
+from shutil import which
 
+from cardiac_base_editor.plugins import ExternalTool, ToolNotConfigured, register_tool
 
-class ArcasHLANotConfigured(Exception):
-    pass
+TOOL = register_tool(ExternalTool(
+    name="arcasHLA",
+    env_vars=[],  # resolved via PATH or an explicit arcashla_dir argument, not an env var
+    setup_instructions=(
+        "git clone https://github.com/RabadanLab/arcasHLA.git\n"
+        "  # or: conda install -c bioconda arcas-hla\n"
+        "  cd arcasHLA && arcasHLA reference --update"
+    ),
+    check=lambda: which("arcasHLA") is not None,
+))
 
 
 def _arcashla_binary(arcashla_dir: str | None) -> str:
     if arcashla_dir:
         binary = os.path.join(arcashla_dir, "arcasHLA")
         if not os.path.exists(binary):
-            raise ArcasHLANotConfigured(f"{binary} not found in {arcashla_dir}")
+            raise ToolNotConfigured(TOOL)
         return binary
 
-    from shutil import which
     binary = which("arcasHLA")
     if not binary:
-        raise ArcasHLANotConfigured(
-            "arcasHLA not found on PATH and no arcashla_dir given. Setup:\n"
-            "  git clone https://github.com/RabadanLab/arcasHLA.git\n"
-            "  # or: conda install -c bioconda arcas-hla\n"
-            "  cd arcasHLA && arcasHLA reference --update"
-        )
+        raise ToolNotConfigured(TOOL)
     return binary
 
 

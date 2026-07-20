@@ -12,11 +12,13 @@ Run:
 
 from __future__ import annotations
 
+import inspect
+import json
 import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -25,6 +27,7 @@ from cardiac_base_editor.genomic_intake import audit, subjects
 from cardiac_base_editor.genomic_intake.extract import build_personalized_cds
 from cardiac_base_editor.pipeline import KNOWN_TARGETS, run as pipeline_run
 from cardiac_base_editor.query import nl as query_nl
+from cardiac_base_editor.query.registry import QUERY_FUNCTIONS
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -143,6 +146,52 @@ async def query_subject(
         Path(tmp_path).unlink(missing_ok=True)
 
     return _render(request, "query_result.html", {"question": question, "answer": answer_text})
+
+
+@app.post("/subjects/{subject_id}/query/{function_name}", response_class=HTMLResponse)
+async def query_function_structured(
+    request: Request,
+    subject_id: str,
+    function_name: str,
+    vcf: UploadFile = File(...),
+    args: str = Form("{}"),
+):
+    """
+    Structured entry point for any @query_function-registered function (see
+    query/registry.py) — the generic counterpart to /query's NL router. Every
+    current and future query function gets this for free, no per-function
+    route needed.
+    """
+    if function_name not in QUERY_FUNCTIONS:
+        raise HTTPException(status_code=404, detail=f"Unknown query function: {function_name}")
+
+    func = QUERY_FUNCTIONS[function_name].func
+    try:
+        parsed_args = json.loads(args)
+    except json.JSONDecodeError:
+        return _render(request, "query_function_result.html", {
+            "function_name": function_name, "error": f"args is not valid JSON: {args!r}", "result": None,
+        })
+
+    valid_params = set(inspect.signature(func).parameters) - {"subject_id", "vcf_path", "operator"}
+    parsed_args = {k: v for k, v in parsed_args.items() if k in valid_params}
+
+    with tempfile.NamedTemporaryFile(suffix=".vcf", delete=False) as tmp:
+        shutil.copyfileobj(vcf.file, tmp)
+        tmp_path = tmp.name
+
+    try:
+        result = func(subject_id=subject_id, vcf_path=tmp_path, operator=WEB_OPERATOR, **parsed_args)
+        error = None
+    except Exception as e:
+        result = None
+        error = str(e)
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    return _render(request, "query_function_result.html", {
+        "function_name": function_name, "result": result, "error": error,
+    })
 
 
 def serve() -> None:

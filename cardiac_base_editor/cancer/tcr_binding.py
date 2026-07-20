@@ -28,25 +28,31 @@ import os
 import subprocess
 import tempfile
 
+from cardiac_base_editor.plugins import ExternalTool, register_tool, require_configured
 
-class PMTnetNotConfigured(Exception):
-    pass
+
+def _pmtnet_ready() -> bool:
+    path = os.environ.get("CBE_PMTNET_DIR")
+    if not path or not os.path.isdir(path):
+        return False
+    return os.path.exists(os.path.join(path, "pMTnet.py"))
+
+
+TOOL = register_tool(ExternalTool(
+    name="pMTnet",
+    env_vars=["CBE_PMTNET_DIR"],
+    setup_instructions=(
+        "git clone https://github.com/tianshilu/pMTnet.git\n"
+        "  # in a Python 3.6/3.7 environment:\n"
+        "  pip install 'tensorflow>1.5' keras==2.2.4 numpy==1.16.3 pandas==0.23.4 scikit-learn==0.20.3 scipy==1.2.1\n"
+        "  export CBE_PMTNET_DIR=/path/to/pMTnet"
+    ),
+    check=_pmtnet_ready,
+))
 
 
 def _pmtnet_dir() -> str:
-    path = os.environ.get("CBE_PMTNET_DIR")
-    if not path or not os.path.isdir(path):
-        raise PMTnetNotConfigured(
-            "CBE_PMTNET_DIR is not set (or doesn't exist). To enable T-cell response prediction:\n"
-            "  git clone https://github.com/tianshilu/pMTnet.git\n"
-            "  # in a Python 3.6/3.7 environment:\n"
-            "  pip install 'tensorflow>1.5' keras==2.2.4 numpy==1.16.3 pandas==0.23.4 scikit-learn==0.20.3 scipy==1.2.1\n"
-            "  export CBE_PMTNET_DIR=/path/to/pMTnet"
-        )
-    script = os.path.join(path, "pMTnet.py")
-    if not os.path.exists(script):
-        raise PMTnetNotConfigured(f"{script} not found — is {path} a real pMTnet checkout?")
-    return path
+    return os.environ["CBE_PMTNET_DIR"]
 
 
 def predict_tcr_binding(records: list[dict], python_executable: str = "python") -> list[dict]:
@@ -59,6 +65,7 @@ def predict_tcr_binding(records: list[dict], python_executable: str = "python") 
     predicted binding strength against 10,000 background TCRs (lower = more
     likely a true TCR-pMHC match, per pMTnet's own scoring convention).
     """
+    require_configured(TOOL)
     pmtnet_dir = _pmtnet_dir()
 
     with tempfile.TemporaryDirectory() as tmp:

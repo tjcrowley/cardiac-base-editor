@@ -45,6 +45,7 @@ cbe query elliot "check off-target risk for the top guide in PCSK9" --vcf /path/
 cbe query elliot "rank neoantigens for the variant at position 55039847 in PCSK9 for HLA alleles A0201 and B0702" --vcf /path/to/elliot.vcf
 
 cbe lnp-predict formulations.json   # LNP delivery-efficacy prediction (LiON) — see setup below, not subject-gated
+cbe plugins   # list optional model integrations and whether each is configured
 
 cbe-web   # local web UI at http://127.0.0.1:8000
 ```
@@ -67,6 +68,60 @@ The query engine (`cbe query` / the web UI's Query tab) is a local-LLM
 (Ollama) front end over the same consent-gated functions — the model only
 ever sees the question and already-computed structured results, never the
 raw genome file.
+
+---
+
+## Adding a new model integration
+
+Two small registries exist so a new integration only needs to touch its own
+files — no other module needs manual updates to pick it up.
+
+**If it needs an external tool/checkpoint the user has to set up** (most
+model integrations — see `mrna_design.py`, `lnp_delivery.py`,
+`cancer/tcr_binding.py`, `cancer/hla_typing.py` for real examples):
+
+```python
+from cardiac_base_editor.plugins import ExternalTool, register_tool, require_configured
+
+TOOL = register_tool(ExternalTool(
+    name="MyModel",
+    env_vars=["CBE_MYMODEL_DIR"],
+    setup_instructions="git clone ...\n  export CBE_MYMODEL_DIR=...",
+    check=lambda: bool(os.environ.get("CBE_MYMODEL_DIR")),
+))
+
+def my_function(...):
+    require_configured(TOOL)  # raises plugins.ToolNotConfigured with the setup instructions above
+    ...
+```
+That's it — `cbe plugins` automatically lists it (configured or not, with
+setup instructions), and any CLI command calling it should catch
+`plugins.ToolNotConfigured` the way `cli.py`'s `cmd_lnp_predict` does.
+
+If the model always has a working fallback instead of a hard requirement
+(like `models/be_dict.py`'s heuristic), don't force it into this pattern —
+warn and degrade instead, it's a genuinely different situation.
+
+**If it should be queryable per-subject** (i.e. it belongs in
+`query/engine.py`, consent-gated like `list_variants`/`rank_guides`/etc.):
+
+```python
+from cardiac_base_editor.query.registry import query_function
+
+@query_function(hint="one-line description for the LLM router")
+def my_query(subject_id: str, gene: str, vcf_path: str, operator: str = "query-engine") -> dict:
+    """Docstring for Python callers — hint above is what the NL router sees instead."""
+    subjects.require_consent(subject_id, gene, operator=operator)
+    ...
+```
+`cbe query`'s LLM router and the web UI's generic
+`/subjects/{id}/query/{function_name}` route both pick it up automatically —
+no changes needed to `query/nl.py` or `web/app.py`. Not every capability
+belongs here, though: `lnp_delivery.py`'s `predict_delivery_efficacy`
+operates on a candidate formulation, not subject genomic data, so it's a
+standalone CLI verb (`cbe lnp-predict`) instead of a query function — don't
+force something through the consent gate that isn't actually about a
+subject's genome.
 
 ---
 

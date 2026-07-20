@@ -31,6 +31,7 @@ from cardiac_base_editor.pipeline import (
     fetch_cds,
     run as pipeline_run,
 )
+from cardiac_base_editor.query.registry import query_function
 
 
 def _resolve_transcript(gene: str) -> str:
@@ -87,6 +88,7 @@ def _variant_to_protein_change(transcript_id: str, vcf_path: str, genomic_pos: i
     }
 
 
+@query_function(hint="list of the subject's variants found in that gene's coding sequence")
 def list_variants(subject_id: str, gene: str, vcf_path: str, operator: str = "query-engine") -> list[dict]:
     """
     All of the subject's SNVs (from vcf_path) that fall within the target
@@ -110,6 +112,7 @@ def list_variants(subject_id: str, gene: str, vcf_path: str, operator: str = "qu
     return hits
 
 
+@query_function(hint="ranked guide RNA candidates for that gene")
 def rank_guides(subject_id: str, gene: str, vcf_path: str, editor: str = "ABE8e", operator: str = "query-engine") -> list[dict]:
     """
     Thin wrapper around the same extract.build_personalized_cds -> pipeline.run
@@ -123,6 +126,7 @@ def rank_guides(subject_id: str, gene: str, vcf_path: str, editor: str = "ABE8e"
     return [asdict(g) for g in guides]
 
 
+@query_function(hint="detailed consequence of one specific variant")
 def explain_variant(subject_id: str, gene: str, vcf_path: str, genomic_pos: int, operator: str = "query-engine") -> dict:
     """
     Combines the codon-level consequence pipeline.py already computes with an
@@ -155,6 +159,10 @@ def explain_variant(subject_id: str, gene: str, vcf_path: str, genomic_pos: int,
     }
 
 
+@query_function(hint=(
+    "real genome-wide BLAST off-target check for one ranked guide (slow, real network call - "
+    "only use when explicitly asked to verify/check off-target risk for a specific guide)"
+))
 def verify_off_target(subject_id: str, gene: str, vcf_path: str, guide_index: int = 0, editor: str = "ABE8e", operator: str = "query-engine") -> dict:
     """
     Opt-in, one-guide-at-a-time genome-wide off-target check via NCBI BLAST.
@@ -175,6 +183,10 @@ def verify_off_target(subject_id: str, gene: str, vcf_path: str, guide_index: in
     return result
 
 
+@query_function(hint=(
+    "ranked candidate neoantigen peptides by predicted MHC-I binding, for a somatic variant "
+    'and a list of HLA alleles (e.g. ["A0201", "B0702"])'
+))
 def rank_neoantigens(subject_id: str, gene: str, vcf_path: str, genomic_pos: int, hla_alleles: list[str], operator: str = "query-engine") -> list[dict]:
     """
     Somatic variant -> candidate neoantigen peptides (cancer.neoantigen) ->
@@ -198,6 +210,10 @@ def rank_neoantigens(subject_id: str, gene: str, vcf_path: str, genomic_pos: int
     return rank_binders([p["peptide"] for p in peptides], hla_alleles)
 
 
+@query_function(hint=(
+    "codon-optimized mRNA sequence for the subject's personalized version of that gene "
+    "(final step: turns the edited/target sequence into an actual mRNA payload)"
+))
 def design_mrna_payload(subject_id: str, gene: str, vcf_path: str, operator: str = "query-engine") -> dict:
     """
     Final pipeline step: subject's personalized CDS for the target gene ->

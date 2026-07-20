@@ -23,31 +23,35 @@ import os
 import re
 import subprocess
 
+from cardiac_base_editor.plugins import ExternalTool, register_tool, require_configured
+
 CODON_USAGE_FILES = {
     "human": "codon_usage_freq_table_human.csv",
     "yeast": "codon_usage_freq_table_yeast.csv",
 }
 
 
-class LinearDesignNotConfigured(Exception):
-    pass
+def _linear_design_ready() -> bool:
+    path = os.environ.get("CBE_LINEARDESIGN_DIR")
+    if not path or not os.path.isdir(path):
+        return False
+    return os.path.exists(os.path.join(path, "bin", "LinearDesign_2D"))
+
+
+TOOL = register_tool(ExternalTool(
+    name="LinearDesign",
+    env_vars=["CBE_LINEARDESIGN_DIR"],
+    setup_instructions=(
+        "git clone https://github.com/LinearDesignSoftware/LinearDesign.git\n"
+        "  cd LinearDesign && make\n"
+        "  export CBE_LINEARDESIGN_DIR=$(pwd)"
+    ),
+    check=_linear_design_ready,
+))
 
 
 def _linear_design_dir() -> str:
-    path = os.environ.get("CBE_LINEARDESIGN_DIR")
-    if not path or not os.path.isdir(path):
-        raise LinearDesignNotConfigured(
-            "CBE_LINEARDESIGN_DIR is not set (or doesn't exist). To enable mRNA design:\n"
-            "  git clone https://github.com/LinearDesignSoftware/LinearDesign.git\n"
-            "  cd LinearDesign && make\n"
-            "  export CBE_LINEARDESIGN_DIR=$(pwd)"
-        )
-    binary = os.path.join(path, "bin", "LinearDesign_2D")
-    if not os.path.exists(binary):
-        raise LinearDesignNotConfigured(
-            f"{binary} not found — run `make` in {path} first."
-        )
-    return path
+    return os.environ["CBE_LINEARDESIGN_DIR"]
 
 
 _OUTPUT_PATTERN = re.compile(
@@ -67,6 +71,7 @@ def design_mrna(protein_seq: str, lambda_: float = 0.0, codon_usage: str = "huma
     the default timeout here is generous (15 min) rather than tuned for the
     short toy sequences unit tests use.
     """
+    require_configured(TOOL)
     ld_dir = _linear_design_dir()
     binary = os.path.join(ld_dir, "bin", "LinearDesign_2D")
     codon_usage_path = os.path.join(ld_dir, CODON_USAGE_FILES.get(codon_usage, codon_usage))

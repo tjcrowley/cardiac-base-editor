@@ -15,6 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cardiac_base_editor import lnp_delivery
+from cardiac_base_editor.plugins import ToolNotConfigured
 
 TEST_SMILES = "CCCCCCCCCCCCCCCOC(=O)CCN(CCCN(CCO)CCO)CCC(=O)OCCCCCCCCCCCCCCC"
 
@@ -49,17 +50,12 @@ EXPECTED_VALUE = -0.0858398
 
 
 def _lion_available() -> bool:
-    try:
-        lnp_delivery._lnpdb_dir()
-        lnp_delivery._chemprop_predict_binary()
-        return True
-    except lnp_delivery.LiONNotConfigured:
-        return False
+    return lnp_delivery.TOOL.check()
 
 
 def test_raises_clear_error_when_lnpdb_dir_not_configured(monkeypatch):
     monkeypatch.delenv("CBE_LNPDB_DIR", raising=False)
-    with pytest.raises(lnp_delivery.LiONNotConfigured):
+    with pytest.raises(ToolNotConfigured):
         lnp_delivery.predict_delivery_efficacy([{"il_smiles": TEST_SMILES}])
 
 

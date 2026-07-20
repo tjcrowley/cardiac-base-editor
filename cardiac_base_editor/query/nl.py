@@ -27,38 +27,28 @@ import os
 
 import requests
 
-from cardiac_base_editor.query import engine
+from cardiac_base_editor.query import engine  # noqa: F401 — import triggers @query_function registration
+from cardiac_base_editor.query.registry import QUERY_FUNCTIONS, describe_for_llm
 
 OLLAMA_URL = os.environ.get("CBE_OLLAMA_URL", "http://localhost:11434")
 QUERY_MODEL = os.environ.get("CBE_QUERY_MODEL", "llama3.1:8b")
 
-TOOL_SCHEMA = """\
-You may call exactly one of these functions to answer the user's question about a
-genomic subject's data. Respond with ONLY a JSON object: {"function": "<name>", "args": {...}}
 
-- list_variants(gene: str) -> list of the subject's variants found in that gene's coding sequence
-- rank_guides(gene: str, editor: str = "ABE8e") -> ranked guide RNA candidates for that gene
-- explain_variant(gene: str, genomic_pos: int) -> detailed consequence of one specific variant
-- verify_off_target(gene: str, guide_index: int = 0, editor: str = "ABE8e") -> real genome-wide BLAST
-  off-target check for one ranked guide (slow, real network call - only use when explicitly asked
-  to verify/check off-target risk for a specific guide)
-- rank_neoantigens(gene: str, genomic_pos: int, hla_alleles: list[str]) -> ranked candidate neoantigen
-  peptides by predicted MHC-I binding, for a somatic variant and a list of HLA alleles (e.g. ["A0201", "B0702"])
-- design_mrna_payload(gene: str) -> codon-optimized mRNA sequence for the subject's personalized
-  version of that gene (final step: turns the edited/target sequence into an actual mRNA payload)
+def _build_tool_schema() -> str:
+    return (
+        "You may call exactly one of these functions to answer the user's question about a\n"
+        'genomic subject\'s data. Respond with ONLY a JSON object: {"function": "<name>", "args": {...}}\n\n'
+        f"{describe_for_llm()}\n\n"
+        "If the question doesn't clearly map to one of these, respond with:\n"
+        '{"function": null, "args": {}}\n'
+    )
 
-If the question doesn't clearly map to one of these, respond with:
-{"function": null, "args": {}}
-"""
 
-FUNCTIONS = {
-    "list_variants": engine.list_variants,
-    "rank_guides": engine.rank_guides,
-    "explain_variant": engine.explain_variant,
-    "verify_off_target": engine.verify_off_target,
-    "rank_neoantigens": engine.rank_neoantigens,
-    "design_mrna_payload": engine.design_mrna_payload,
-}
+# Built once at import time from query/engine.py's @query_function-decorated
+# functions (query/registry.py) — no hand-maintained duplicate list to drift
+# out of sync. Adding a new query function needs zero changes here.
+TOOL_SCHEMA = _build_tool_schema()
+FUNCTIONS = {name: spec.func for name, spec in QUERY_FUNCTIONS.items()}
 
 
 class QueryRoutingError(Exception):
@@ -106,7 +96,8 @@ def answer(subject_id: str, question: str, vcf_path: str) -> str:
         return f"Couldn't route that question: {e}"
 
     if func_name not in FUNCTIONS:
-        return "I couldn't map that question to a supported query (list variants, rank guides, or explain a specific variant)."
+        supported = ", ".join(FUNCTIONS.keys())
+        return f"I couldn't map that question to a supported query ({supported})."
 
     func = FUNCTIONS[func_name]
     valid_params = set(inspect.signature(func).parameters) - {"subject_id", "vcf_path", "operator"}

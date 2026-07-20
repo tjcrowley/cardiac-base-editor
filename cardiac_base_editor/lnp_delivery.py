@@ -40,6 +40,8 @@ import subprocess
 import tempfile
 from functools import lru_cache
 
+from cardiac_base_editor.plugins import ExternalTool, register_tool, require_configured
+
 CHECKPOINT_SUBPATH = "data/LNPDB_for_LiON/single_split/trained_model_checkpoints"
 SCHEMA_CSV_SUBPATH = "data/LNPDB_for_LiON/single_split/train_extra_x.csv"
 
@@ -66,38 +68,41 @@ CATEGORICAL_GROUPS = [
 ]
 
 
-class LiONNotConfigured(Exception):
-    pass
+def _lnpdb_ready() -> bool:
+    path = os.environ.get("CBE_LNPDB_DIR")
+    if not path or not os.path.isdir(path):
+        return False
+    return os.path.isdir(os.path.join(path, CHECKPOINT_SUBPATH))
+
+
+def _lion_venv_ready() -> bool:
+    venv = os.environ.get("CBE_LION_VENV_DIR")
+    if not venv or not os.path.isdir(venv):
+        return False
+    return os.path.exists(os.path.join(venv, "bin", "chemprop_predict"))
+
+
+TOOL = register_tool(ExternalTool(
+    name="LiON",
+    env_vars=["CBE_LNPDB_DIR", "CBE_LION_VENV_DIR"],
+    setup_instructions=(
+        "git clone https://github.com/evancollins1/LNPDB.git\n"
+        "  export CBE_LNPDB_DIR=$(pwd)/LNPDB\n"
+        "  pyenv install 3.8.18\n"
+        "  ~/.pyenv/versions/3.8.18/bin/python3.8 -m venv ~/lion-venv\n"
+        "  ~/lion-venv/bin/pip install chemprop==1.7.0\n"
+        "  export CBE_LION_VENV_DIR=~/lion-venv"
+    ),
+    check=lambda: _lnpdb_ready() and _lion_venv_ready(),
+))
 
 
 def _lnpdb_dir() -> str:
-    path = os.environ.get("CBE_LNPDB_DIR")
-    if not path or not os.path.isdir(path):
-        raise LiONNotConfigured(
-            "CBE_LNPDB_DIR is not set (or doesn't exist). To enable LNP delivery prediction:\n"
-            "  git clone https://github.com/evancollins1/LNPDB.git\n"
-            "  export CBE_LNPDB_DIR=$(pwd)/LNPDB\n"
-            "(also see CBE_LION_VENV_DIR requirements in this module's docstring)"
-        )
-    if not os.path.isdir(os.path.join(path, CHECKPOINT_SUBPATH)):
-        raise LiONNotConfigured(f"{CHECKPOINT_SUBPATH} not found under {path} — is this a real LNPDB checkout?")
-    return path
+    return os.environ["CBE_LNPDB_DIR"]
 
 
 def _chemprop_predict_binary() -> str:
-    venv = os.environ.get("CBE_LION_VENV_DIR")
-    if not venv or not os.path.isdir(venv):
-        raise LiONNotConfigured(
-            "CBE_LION_VENV_DIR is not set (or doesn't exist). To enable LNP delivery prediction:\n"
-            "  pyenv install 3.8.18\n"
-            "  ~/.pyenv/versions/3.8.18/bin/python3.8 -m venv ~/lion-venv\n"
-            "  ~/lion-venv/bin/pip install chemprop==1.7.0\n"
-            "  export CBE_LION_VENV_DIR=~/lion-venv"
-        )
-    binary = os.path.join(venv, "bin", "chemprop_predict")
-    if not os.path.exists(binary):
-        raise LiONNotConfigured(f"{binary} not found — did you `pip install chemprop==1.7.0` in {venv}?")
-    return binary
+    return os.path.join(os.environ["CBE_LION_VENV_DIR"], "bin", "chemprop_predict")
 
 
 @lru_cache(maxsize=1)
@@ -139,6 +144,7 @@ def predict_delivery_efficacy(formulations: list[dict], no_cuda: bool = True) ->
     (numeric ratios + categorical group keys). Returns each formulation with
     an added "predicted_experiment_value" field.
     """
+    require_configured(TOOL)
     lnpdb_dir = _lnpdb_dir()
     chemprop_predict = _chemprop_predict_binary()
     header = _load_feature_schema()

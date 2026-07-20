@@ -7,7 +7,6 @@ Skipped if that env var isn't set/valid — this is a real external tool this
 environment doesn't ship, same as the Ollama/BLAST/mhcflurry live tests.
 """
 
-import os
 import sys
 from pathlib import Path
 
@@ -17,21 +16,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cardiac_base_editor import mrna_design
 from cardiac_base_editor.pipeline import CODON_TABLE
+from cardiac_base_editor.plugins import ToolNotConfigured
 
 PROTEIN = "MGKPVTLYDVAEYAGVSYQTVSRVVNQASHVSAKTREKVEAAMAELNYIPNRVAQQLAGKQ"
 
 
 def _linear_design_available() -> bool:
-    try:
-        mrna_design._linear_design_dir()
-        return True
-    except mrna_design.LinearDesignNotConfigured:
-        return False
+    return mrna_design.TOOL.check()
 
 
 def test_raises_clear_error_when_not_configured(monkeypatch):
     monkeypatch.delenv("CBE_LINEARDESIGN_DIR", raising=False)
-    with pytest.raises(mrna_design.LinearDesignNotConfigured):
+    with pytest.raises(ToolNotConfigured):
         mrna_design.design_mrna(PROTEIN)
 
 

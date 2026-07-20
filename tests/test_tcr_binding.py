@@ -16,17 +16,18 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cardiac_base_editor.cancer import tcr_binding
+from cardiac_base_editor.plugins import ToolNotConfigured
 
 
 def test_raises_clear_error_when_not_configured(monkeypatch):
     monkeypatch.delenv("CBE_PMTNET_DIR", raising=False)
-    with pytest.raises(tcr_binding.PMTnetNotConfigured):
+    with pytest.raises(ToolNotConfigured):
         tcr_binding.predict_tcr_binding([{"cdr3": "CASSVASSGNIQYF", "antigen": "TQPPSGFR", "hla": "A*11:01"}])
 
 
 def test_raises_when_configured_dir_missing_script(monkeypatch, tmp_path):
     monkeypatch.setenv("CBE_PMTNET_DIR", str(tmp_path))  # exists but no pMTnet.py inside
-    with pytest.raises(tcr_binding.PMTnetNotConfigured):
+    with pytest.raises(ToolNotConfigured):
         tcr_binding.predict_tcr_binding([{"cdr3": "X", "antigen": "Y", "hla": "Z"}])
 
 

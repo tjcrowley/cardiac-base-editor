@@ -15,16 +15,17 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from cardiac_base_editor.cancer import hla_typing
+from cardiac_base_editor.plugins import ToolNotConfigured
 
 
-def test_raises_clear_error_when_not_on_path_and_no_dir_given():
-    with patch("shutil.which", return_value=None):
-        with pytest.raises(hla_typing.ArcasHLANotConfigured):
-            hla_typing.type_hla_from_rnaseq("/fake/path.bam")
+def test_raises_clear_error_when_not_on_path_and_no_dir_given(monkeypatch):
+    monkeypatch.setattr(hla_typing, "which", lambda name: None)
+    with pytest.raises(ToolNotConfigured):
+        hla_typing.type_hla_from_rnaseq("/fake/path.bam")
 
 
 def test_raises_when_arcashla_dir_missing_binary(tmp_path):
-    with pytest.raises(hla_typing.ArcasHLANotConfigured):
+    with pytest.raises(ToolNotConfigured):
         hla_typing.type_hla_from_rnaseq("/fake/path.bam", arcashla_dir=str(tmp_path))
 
 

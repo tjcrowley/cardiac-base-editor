@@ -1,0 +1,6 @@
+<p><strong>{{ function_name }}</strong></p>
+{% if error %}
+<p class="error">{{ error }}</p>
+{% else %}
+<pre>{{ result | tojson(indent=2) }}</pre>
+{% endif %}

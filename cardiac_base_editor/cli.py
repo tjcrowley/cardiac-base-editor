@@ -8,6 +8,7 @@ Usage:
     cbe run <subject_id> <gene> --vcf path/to/subject.vcf [--editor ABE8e]
     cbe query <subject_id> "<question>" --vcf path/to/subject.vcf
     cbe lnp-predict formulations.json
+    cbe plugins
 
 Every `run`/`query` invocation checks consent first (subjects.require_consent).
 `run` builds the subject's personalized CDS (extract.py) and hands it to the
@@ -29,7 +30,13 @@ from cardiac_base_editor.genomic_intake import subjects
 from cardiac_base_editor.genomic_intake.extract import build_personalized_cds
 from cardiac_base_editor.lnp_delivery import predict_delivery_efficacy
 from cardiac_base_editor.pipeline import KNOWN_TARGETS, run as pipeline_run
+from cardiac_base_editor.plugins import TOOL_REGISTRY, ToolNotConfigured
 from cardiac_base_editor.query import nl as query_nl
+# query.nl -> query.engine already imports mrna_design; cancer.hla_typing and
+# cancer.tcr_binding aren't otherwise imported anywhere cli.py touches, so
+# they need an explicit import here for `cbe plugins` to see them registered.
+import cardiac_base_editor.cancer.hla_typing  # noqa: F401
+import cardiac_base_editor.cancer.tcr_binding  # noqa: F401
 
 
 def cmd_consent_grant(args: argparse.Namespace) -> None:
@@ -77,7 +84,12 @@ def cmd_lnp_predict(args: argparse.Namespace) -> None:
     with open(args.formulations_json) as f:
         formulations = json.load(f)
 
-    results = predict_delivery_efficacy(formulations)
+    try:
+        results = predict_delivery_efficacy(formulations)
+    except ToolNotConfigured as e:
+        print(f"BLOCKED: {e}", file=sys.stderr)
+        sys.exit(1)
+
     results.sort(key=lambda r: r["predicted_experiment_value"], reverse=True)
 
     print(f"{'#':<3} {'IL_SMILES':<50} {'Predicted value':<15}")
@@ -85,6 +97,20 @@ def cmd_lnp_predict(args: argparse.Namespace) -> None:
     for i, r in enumerate(results, 1):
         smiles = r["il_smiles"][:47] + "..." if len(r["il_smiles"]) > 50 else r["il_smiles"]
         print(f"{i:<3} {smiles:<50} {r['predicted_experiment_value']:<15.4f}")
+
+
+def cmd_plugins(args: argparse.Namespace) -> None:
+    if not TOOL_REGISTRY:
+        print("No optional model plugins registered.")
+        return
+
+    for tool in TOOL_REGISTRY.values():
+        status = "configured" if tool.check() else "NOT configured"
+        print(f"{tool.name}: {status}")
+        if not tool.check():
+            for line in tool.setup_instructions.splitlines():
+                print(f"    {line}")
+        print()
 
 
 def main() -> None:
@@ -122,6 +148,9 @@ def main() -> None:
     lnp_p = sub.add_parser("lnp-predict")
     lnp_p.add_argument("formulations_json", help="Path to a JSON file: a list of formulation dicts")
     lnp_p.set_defaults(func=cmd_lnp_predict)
+
+    plugins_p = sub.add_parser("plugins", help="List optional model integrations and their configuration status")
+    plugins_p.set_defaults(func=cmd_plugins)
 
     args = parser.parse_args()
     args.func(args)
