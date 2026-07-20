@@ -54,6 +54,12 @@ cbe-web   # local web UI at http://127.0.0.1:8000
 `cardiac_base_editor/lnp_delivery.py`'s module docstring for the one-time
 `pyenv`/venv setup and the `CBE_LNPDB_DIR` / `CBE_LION_VENV_DIR` env vars.
 
+Real BE-DICT guide scoring (`cbe run`/`rank_guides`) runs in-process — clone
+`github.com/uzh-dqbm-cmi/BEDICT-V2`, `pip install matplotlib seaborn` (plus
+this package's own `pandas<3.0` pin, required for BEDICT-V2's code), and set
+`CBE_BEDICTV2_DIR`. See `cardiac_base_editor/models/be_dict.py`'s docstring
+for the real-model-vs-heuristic tradeoffs.
+
 See `cardiac_base_editor/genomic_intake/README.md` for the full consent/audit/
 retention model behind real-genome runs and queries — every genome is treated
 as private: consent-gated, audit-logged, and fully purgeable on revocation.
@@ -66,7 +72,7 @@ raw genome file.
 
 ## Roadmap
 
-1. **Guide scoring:** Replace heuristics with [BE-DICT](https://github.com/hui-liang/BE-DICT) transformer — **interface shipped** (`cardiac_base_editor/models/be_dict.py`), pluggable via `CBE_BEDICT_CHECKPOINT`; falls back to the existing heuristic until a real checkpoint is available (next funded milestone)
+1. **Guide scoring:** Replace heuristics with a real BE-DICT model — **shipped** (`cardiac_base_editor/models/be_dict.py`), backed by [BEDICT-V2](https://github.com/uzh-dqbm-cmi/BEDICT-V2) (real pretrained checkpoints, MIT licensed), pluggable via `CBE_BEDICTV2_DIR`. Honest caveat: this wraps BEDICT-V2's "proportion" model, which predicts the *relative* likelihood among bystander-editing outcomes, not absolute efficiency — genuinely informative for bystander-risk guides (multiple targetable A's), but trivially returns 1.0 for single-target guides by construction. BEDICT-V2's separate absolute-efficiency CNN model would fix that but needs extra engineered features (RNA folding/MFE, melting temp) this pass didn't reproduce; falls back to the original heuristic for editors without a trained model (`ABE7.10`) or when unconfigured
 2. **Off-target:** Genome-wide BLAST per guide — **shipped** (`cardiac_base_editor/models/off_target.py`), real queries against NCBI's public BLAST API; opt-in per-guide via `cbe query`'s `verify_off_target` (not run automatically — a real genome-wide BLAST search takes real wall-clock time)
 3. **Protein consequence:** ESM-2 call on resulting amino acid change — **shipped** (`cardiac_base_editor/models/protein_consequence.py`), used by `cbe query`'s `explain_variant`
 4. **Cancer — MHC binding:** **shipped** (`cardiac_base_editor/cancer/`) — somatic variant → candidate neoantigen peptides → MHC-I binding ranking via mhcflurry, exposed as `cbe query`'s `rank_neoantigens`. Still requires HLA alleles to be supplied directly (see #4b)

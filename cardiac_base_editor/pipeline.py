@@ -28,6 +28,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Literal
 
+from cardiac_base_editor.models import be_dict
+
 
 # ─────────────────────────────────────────────
 # Ensembl REST API
@@ -122,6 +124,7 @@ class GuideRNA:
     editor: str
     edit_window_adenines: list[int]
     gc_content: float
+    context_after_pam: str = ""  # one flanking base beyond the PAM, when available — see be_dict.py
     efficiency_score: float | None = None
     off_target_score: float | None = None
     bystander_risk: bool = False
@@ -136,7 +139,12 @@ def _pam_regex(pam: str) -> re.Pattern:
     iupac = {"N": "[ACGT]", "A": "A", "C": "C", "G": "G", "T": "T",
              "R": "[AG]", "Y": "[CT]", "W": "[AT]", "S": "[GC]"}
     pattern = "".join(iupac.get(c, c) for c in pam)
-    return re.compile(r"(?=([ACGT]{20}" + pattern + r"))", re.IGNORECASE)
+    # Trailing [ACGT]? captures one optional base of context after the PAM —
+    # BEDICT-V2 (models/be_dict.py) was trained on 24nt windows (20nt
+    # protospacer + PAM + 1 flanking base), one more than the PAM alone.
+    # Optional so guides at the very end of a sequence (no base available
+    # after the PAM) are still found, just without that extra context.
+    return re.compile(r"(?=([ACGT]{20}" + pattern + r"[ACGT]?))", re.IGNORECASE)
 
 def _reverse_complement(seq: str) -> str:
     return seq.translate(str.maketrans("ACGT", "TGCA"))[::-1]
@@ -155,7 +163,8 @@ def find_guides(sequence: str, editor: BaseEditor) -> list[GuideRNA]:
         for match in pat.finditer(s):
             hit   = match.group(1)
             proto = hit[:20]
-            pam_s = hit[20:]
+            pam_s = hit[20:20 + len(editor.pam)]
+            context_after_pam = hit[20 + len(editor.pam):20 + len(editor.pam) + 1]
 
             targetable = [
                 i + 1 for i, nt in enumerate(proto)
@@ -173,6 +182,7 @@ def find_guides(sequence: str, editor: BaseEditor) -> list[GuideRNA]:
                 editor=editor.name,
                 edit_window_adenines=targetable,
                 gc_content=gc,
+                context_after_pam=context_after_pam,
                 bystander_risk=len(targetable) > 1,
             ))
 
@@ -185,17 +195,17 @@ def find_guides(sequence: str, editor: BaseEditor) -> list[GuideRNA]:
 
 def score_guides(guides: list[GuideRNA]) -> list[GuideRNA]:
     """
-    Heuristic scoring.
-
-    Production upgrade: replace efficiency_score with BE-DICT
-    (github.com/hui-liang/BE-DICT) — transformer fine-tuned on
-    Arbab et al. 2020 (38k guide RNAs with measured outcomes).
+    Efficiency scoring via models.be_dict.score_efficiency() — uses the real
+    BEDICT-V2 model when CBE_BEDICTV2_DIR is configured and the editor has a
+    trained model available, otherwise the heuristic formula that used to
+    live inline here (now in be_dict._heuristic_score(), single source of
+    truth for both call sites).
     """
     for g in guides:
-        gc_penalty        = abs(g.gc_content - 0.525) * 1.8
-        bystander_penalty = 0.25 if g.bystander_risk else 0.0
-        polyt_penalty     = 0.30 if "TTTT" in g.protospacer else 0.0
-        g.efficiency_score = max(0.0, 1.0 - gc_penalty - bystander_penalty - polyt_penalty)
+        g.efficiency_score = be_dict.score_efficiency(
+            g.protospacer, g.editor, g.gc_content, g.bystander_risk,
+            pam_seq=g.pam_seq + g.context_after_pam, target_positions=g.edit_window_adenines,
+        )
 
         # Seed region = PAM-proximal 12 nt
         seed = g.protospacer[8:]
@@ -385,8 +395,8 @@ if __name__ == "__main__":
         )
 
     print()
-    print("Production upgrades (in order):")
-    print("  1. swap efficiency_score → BE-DICT (github.com/hui-liang/BE-DICT)")
-    print("  2. swap off_target_score → crisprSFM or genome-wide BLAST")
-    print("  3. add AlphaMissense call to validate protein-level consequences")
-    print("  4. add LinearDesign for codon-optimized mRNA payload sequence")
+    print("Real-model upgrades available via `cbe query` (see README roadmap):")
+    print("  efficiency_score: BEDICT-V2 if CBE_BEDICTV2_DIR is set (falls back to heuristic otherwise)")
+    print("  off-target verification: `cbe query ... \"check off-target risk for guide N\"` (real NCBI BLAST)")
+    print("  protein consequence: ESM-2 via `explain_variant`")
+    print("  mRNA payload design: LinearDesign via `design_mrna_payload`")

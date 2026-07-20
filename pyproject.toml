@@ -19,6 +19,7 @@ dependencies = [
     "uvicorn",
     "jinja2",
     "python-multipart",
+    "pandas<3.0",  # BEDICT-V2 (models/be_dict.py) relies on pre-3.0 DataFrame.replace() downcast behavior
 ]
 
 [project.optional-dependencies]
